@@ -4,6 +4,7 @@ import MarkdownRenderer from './markdown/MarkdownRenderer';
 
 const Chat = (props) => {
     const { currentFolder } = props;
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
     const token = localStorage.getItem('token');
 
@@ -52,10 +53,10 @@ const Chat = (props) => {
 
             try {
                 const response = await axios.get(
-                    'http://localhost:5000/api/chat/chats',
+                    `${apiBaseUrl}/api/chat/chats`,
                     {
                         params: {
-                            folderId: currentFolder,
+                            folderId: currentFolder._id,
                         },
                         headers,
                     }
@@ -94,7 +95,7 @@ const Chat = (props) => {
 
         try {
             const response = await axios.get(
-                'http://localhost:5000/api/chat/messages',
+                `${apiBaseUrl}/api/chat/messages`,
                 {
                     params: {
                         chatId,
@@ -126,10 +127,10 @@ const Chat = (props) => {
 
         try {
             const response = await axios.get(
-                'http://localhost:5000/api/chat/chats',
+                `${apiBaseUrl}/api/chat/chats`,
                 {
                     params: {
-                        folderId: currentFolder,
+                        folderId: currentFolder._id,
                     },
                     headers,
                 }
@@ -158,9 +159,12 @@ const Chat = (props) => {
         setMessage('');
         setSendingMessage(true);
 
+        const context = [currentFolder];
+
         const tempUserMessage = {
             _id: `temp-${Date.now()}`,
             text: trimmedMessage,
+            context,
             sender: 'user',
             model: null,
             status: 'completed',
@@ -174,11 +178,12 @@ const Chat = (props) => {
 
         try {
             const response = await axios.post(
-                'http://localhost:5000/api/chat/message',
+                `${apiBaseUrl}/api/chat/message`,
                 {
                     chatId: activeChatId,
-                    folderId: currentFolder,
+                    folderId: currentFolder._id,
                     text: trimmedMessage,
+                    context,
                     model: selectedModel
                 },
                 {
@@ -380,25 +385,59 @@ const Chat = (props) => {
             {/* Composer — always available */}
             <div className="p-2">
 
-                {/* Model selector */}
-                <div className="mb-2">
-                    <select
-                        value={selectedModel}
-                        onChange={(event) =>
-                            setSelectedModel(event.target.value)
-                        }
-                        className="bg-transparent border border-[#f3e9dc]/70 rounded-md px-2 py-1 text-xs text-[#f3e9dc] outline-none"
-                    >
-                        {models.map((model) => (
-                            <option
-                                key={model.value}
-                                value={model.value}
-                                className="text-[#5e3023]"
-                            >
-                                {model.name}
-                            </option>
-                        ))}
-                    </select>
+                {/* Options */}
+                <div className="mb-2 flex">
+
+                    {/* Model selector */}
+                    <div className="mr-2">
+                        <select
+                            value={selectedModel}
+                            onChange={(event) =>
+                                setSelectedModel(event.target.value)
+                            }
+                            className="bg-transparent border border-[#f3e9dc]/70 rounded-md px-2 py-1 text-xs text-[#f3e9dc] outline-none"
+                        >
+                            {models.map((model) => (
+                                <option
+                                    key={model.value}
+                                    value={model.value}
+                                    className="text-[#5e3023]"
+                                >
+                                    {model.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Context */}
+                    <div className="text-xs p-1 flex">
+                        <div className="p-1 rounded-md border border-white mr-2">Folder: {currentFolder?.name}</div>
+                        <div className="p-1 rounded-md border border-white mr-2 flex cursor-pointer">
+                            Current Topic <span className='ml-1'>
+                                <svg
+                                    viewBox="-2.5 0 32 32"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-4 h-4"
+                                    fill="none"
+                                >
+                                    <g id="SVGRepo_bgCarrier" strokeWidth="0" />
+                                    <g
+                                        id="SVGRepo_tracerCarrier"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                    <g id="SVGRepo_iconCarrier">
+                                        <g id="icomoon-ignore" />
+                                        <path
+                                            d="M0 10.284l0.505 0.36c0.089 0.064 0.92 0.621 2.604 0.621 0.27 0 0.55-0.015 0.836-0.044 3.752 4.346 6.411 7.472 7.060 8.299-1.227 2.735-1.42 5.808-0.537 8.686l0.256 0.834 7.63-7.631 8.309 8.309 0.742-0.742-8.309-8.309 7.631-7.631-0.834-0.255c-2.829-0.868-5.986-0.672-8.686 0.537-0.825-0.648-3.942-3.3-8.28-7.044 0.11-0.669 0.23-2.183-0.575-3.441l-0.352-0.549-8.001 8.001zM1.729 10.039l6.032-6.033c0.385 1.122 0.090 2.319 0.086 2.334l-0.080 0.314 0.245 0.214c7.409 6.398 8.631 7.39 8.992 7.546l-0.002 0.006 0.195 0.058 0.185-0.087c2.257-1.079 4.903-1.378 7.343-0.836l-13.482 13.481c-0.55-2.47-0.262-5.045 0.837-7.342l0.104-0.218-0.098-0.221-0.031 0.013c-0.322-0.632-1.831-2.38-7.498-8.944l-0.185-0.215-0.282 0.038c-0.338 0.045-0.668 0.069-0.981 0.069-0.595 0-1.053-0.083-1.38-0.176z"
+                                            fill="currentColor"
+                                        />
+                                    </g>
+                                </svg>
+                            </span>
+                        </div>
+                    </div>
+
                 </div>
 
                 {/* Input */}

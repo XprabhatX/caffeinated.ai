@@ -9,6 +9,9 @@ const Navigation = (props) => {
         currentFolder,
         setCurrentFolder
     } = props;
+
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
     const token = localStorage.getItem('token');
 
     const hour = new Date().getHours();
@@ -34,7 +37,7 @@ const Navigation = (props) => {
         const fetchFolderData = async () => {
             try {
                 const response = await axios.get(
-                    'http://localhost:5000/api/folders',
+                    `${apiBaseUrl}/api/folders`,
                     { headers }
                 );
 
@@ -57,7 +60,7 @@ const Navigation = (props) => {
 
         try {
             const response = await axios.get(
-                'http://localhost:5000/api/topics',
+                `${apiBaseUrl}/api/topics`,
                 {
                     params: {
                         folderId,
@@ -88,7 +91,7 @@ const Navigation = (props) => {
 
         try {
             const response = await axios.post(
-                'http://localhost:5000/api/folders',
+                `${apiBaseUrl}/api/folders`,
                 {
                     name,
                     description,
@@ -108,18 +111,19 @@ const Navigation = (props) => {
     };
 
     // Open / close folder
-    const handleOpenFolder = async (folderId) => {
+    const handleOpenFolder = async (folder) => {
         // Close currently opened folder
-        if (folderId === openedFolder) {
+        if (folder._id === openedFolder) {
             setOpenedFolder(null);
             setCurrentFolder(null);
             setTopics([]);
             return;
         }
 
-        setOpenedFolder(folderId);
-        setCurrentFolder(folderId);
-        await fetchTopics(folderId);
+        setOpenedFolder(folder._id);
+        setCurrentFolder(folder);
+
+        await fetchTopics(folder._id);
     };
 
     // Create topic
@@ -132,7 +136,7 @@ const Navigation = (props) => {
 
         try {
             await axios.post(
-                'http://localhost:5000/api/topics',
+                `${apiBaseUrl}/api/topics`,
                 {
                     name: topicName,
                     folderId,
@@ -156,7 +160,7 @@ const Navigation = (props) => {
     const handleDeleteTopic = async (topicId, folderId) => {
         try {
             await axios.delete(
-                `http://localhost:5000/api/topics/${topicId}`,
+                `${apiBaseUrl}/api/topics/${topicId}`,
                 { headers }
             );
 
@@ -175,7 +179,7 @@ const Navigation = (props) => {
     // Select Topic
     const handleSelectTopic = async (topicId) => {
         setCurrentTopic(topicId);
-    }
+    };
 
     return (
         <div className="w-[13%] h-full bg-[#895737] text-[#f3e9dc]">
@@ -194,7 +198,7 @@ const Navigation = (props) => {
                                 {/* Folder toggle */}
                                 <div
                                     onClick={() =>
-                                        handleOpenFolder(folder._id)
+                                        handleOpenFolder(folder)
                                     }
                                     className="cursor-pointer"
                                 >
@@ -275,8 +279,16 @@ const Navigation = (props) => {
                                             >
                                                 {/* Topic */}
                                                 <div
-                                                    className={`hover:underline cursor-pointer truncate px-2 rounded-lg ${t._id === currentTopic ? 'bg-white/10' : ''}`}
-                                                    onClick={() => handleSelectTopic(t._id)}
+                                                    className={`hover:underline cursor-pointer truncate px-2 rounded-lg ${
+                                                        t._id === currentTopic
+                                                            ? 'bg-white/10'
+                                                            : ''
+                                                    }`}
+                                                    onClick={() =>
+                                                        handleSelectTopic(
+                                                            t._id
+                                                        )
+                                                    }
                                                 >
                                                     {t.name}
                                                 </div>
@@ -286,7 +298,10 @@ const Navigation = (props) => {
                                                     type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleDeleteTopic(topic._id, folder._id);
+                                                        handleDeleteTopic(
+                                                            t._id,
+                                                            folder._id
+                                                        );
                                                     }}
                                                     className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ml-2"
                                                     title="Delete topic"

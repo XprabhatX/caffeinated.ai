@@ -3,6 +3,9 @@ import { useNavigate, Link } from 'react-router'
 import axios from 'axios'
 
 const SignUp = ({ user, setUser }) => {
+
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -22,7 +25,7 @@ const SignUp = ({ user, setUser }) => {
             const password = passwordRef.current.value
 
             const response = await axios.post(
-                'http://localhost:5000/api/users/signup',
+                `${apiBaseUrl}/api/users/signup`,
                 {
                     username,
                     email,

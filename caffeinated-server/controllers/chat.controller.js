@@ -10,6 +10,7 @@ export const sendMessage = async (req, res, next) => {
             chatId,
             folderId,
             text,
+            context,
             model
         } = req.body;
 
@@ -32,6 +33,7 @@ export const sendMessage = async (req, res, next) => {
             chatId,
             folderId,
             text,
+            context,
             model
         });
 

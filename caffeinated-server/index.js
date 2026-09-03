@@ -10,20 +10,20 @@ import chatRouter from './routes/chat.route.js';
 
 dotenv.config();
 
-const app       = express();
-const PORT      = process.env.PORT || 5000;
+const app = express();
+const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173', 
-  
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  
-  credentials: true, 
-  
-  optionsSuccessStatus: 200 
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+
+    allowedHeaders: ['Content-Type', 'Authorization'],
+
+    credentials: true,
+
+    optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
@@ -31,7 +31,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    return res.json({message: "healthy server check"});
+    return res.json({ message: "healthy server check" });
 })
 
 app.use('/api/users', userRouter);
@@ -52,5 +52,7 @@ const connectDB = async () => {
 connectDB().then(() => {
     app.listen(PORT, () => {
         console.log(`⚡caffeinated server running at http://localhost:${PORT}`);
+        console.log('LM_STUDIO_URL:', process.env.LM_STUDIO_URL);
+        console.log('MCP_SERVER_URL:', process.env.MCP_SERVER_URL);
     })
 })

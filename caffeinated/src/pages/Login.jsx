@@ -4,6 +4,8 @@ import axios from 'axios'
 
 const Login = ({ user, setUser }) => {
 
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
     const navigate = useNavigate()
 
     const emailRef = useRef(null)
@@ -21,7 +23,7 @@ const Login = ({ user, setUser }) => {
             const password = passwordRef.current.value
 
             const response = await axios.post(
-                'http://localhost:5000/api/users/login',
+                `${apiBaseUrl}/api/users/login`,
                 {
                     email,
                     password

@@ -6,6 +6,8 @@ import MarkdownRenderer from './markdown/MarkdownRenderer';
 const Topic = ({ currentTopic }) => {
     const token = localStorage.getItem('token');
 
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
     const [topic, setTopic] = useState(null);
 
     useEffect(() => {
@@ -17,7 +19,7 @@ const Topic = ({ currentTopic }) => {
         const fetchTopicData = async () => {
             try {
                 const response = await axios.get(
-                    `http://localhost:5000/api/topics/${currentTopic}`,
+                    `${apiBaseUrl}/api/topics/${currentTopic}`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,

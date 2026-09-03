@@ -23,6 +23,11 @@ const messageSchema = new Schema(
             required: true
         },
 
+        context: {
+            type: Schema.Types.Mixed,
+            default: null
+        },
+
         sender: {
             type: String,
             enum: ['user', 'assistant'],

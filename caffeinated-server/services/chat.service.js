@@ -3,8 +3,11 @@ import { Chat } from '../models/chat.model.js';
 import { Message } from '../models/message.model.js';
 import { Folder } from '../models/folder.model.js';
 
-const LM_STUDIO_URL = process.env.LM_STUDIO_URL;
-
+import jwt from 'jsonwebtoken';
+import {
+    Client,
+    StreamableHTTPClientTransport
+} from '@modelcontextprotocol/client';
 
 // Abstract model call
 export const cwm = async ({
@@ -12,10 +15,11 @@ export const cwm = async ({
     messages,
     model,
     temperature = 0.7,
-    maxTokens = 512
+    maxTokens = 512,
+    tools = undefined
 }) => {
     const response = await axios.post(
-        LM_STUDIO_URL,
+        process.env.LM_STUDIO_URL,
         {
             model,
             messages: messages || [
@@ -24,6 +28,7 @@ export const cwm = async ({
                     content: text
                 }
             ],
+            ...(tools?.length ? { tools } : {}),
             temperature,
             max_tokens: maxTokens,
             stream: false
@@ -47,12 +52,127 @@ export const cwm = async ({
 };
 
 
+const createMcpClient = async (userId) => {
+    const token = jwt.sign(
+        {
+            id: userId
+        },
+        process.env.JWT_SECRET,
+        {
+            expiresIn: process.env.MCP_JWT_EXPIRES_IN || '5m'
+        }
+    );
+
+    const client = new Client({
+        name: 'caffeinated-server',
+        version: '1.0.0'
+    });
+
+    const transport = new StreamableHTTPClientTransport(
+        new URL(process.env.MCP_SERVER_URL),
+        {
+            requestInit: {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        }
+    );
+
+    await client.connect(transport);
+
+    return client;
+};
+
+
+const getMcpTools = async (client) => {
+    const result = await client.listTools();
+
+    return result.tools.map((tool) => ({
+        type: 'function',
+        function: {
+            name: tool.name,
+            description: tool.description || '',
+            parameters: tool.inputSchema || {
+                type: 'object',
+                properties: {}
+            }
+        }
+    }));
+};
+
+
+const executeMcpTool = async (
+    client,
+    toolCall
+) => {
+    const toolName = toolCall.function.name;
+
+    let argumentsObject = {};
+
+    try {
+        argumentsObject = toolCall.function.arguments
+            ? JSON.parse(toolCall.function.arguments)
+            : {};
+    } catch {
+        throw new Error(
+            `Invalid arguments for tool ${toolName}`
+        );
+    }
+
+    const result = await client.callTool({
+        name: toolName,
+        arguments: argumentsObject
+    });
+
+    return result;
+};
+
+
+const serializeMcpResult = (result) => {
+    if (!result) {
+        return '';
+    }
+
+    if (result.structuredContent) {
+        return JSON.stringify(
+            result.structuredContent
+        );
+    }
+
+    if (Array.isArray(result.content)) {
+        return result.content
+            .map((item) => {
+                if (item.type === 'text') {
+                    return item.text;
+                }
+
+                return JSON.stringify(item);
+            })
+            .join('\n');
+    }
+
+    return JSON.stringify(result);
+};
+
+const buildMessages = ({ context, messages }) => [
+    {
+        role: 'system',
+        content: `
+Current application context:
+${JSON.stringify(context)}
+`
+    },
+    ...messages
+];
+
 // Create a message / run a chat
 export const chat = async ({
     userId,
     chatId = null,
     folderId = null,
     text,
+    context,
     model,
     temperature = 0.7,
     maxTokens = 512
@@ -158,6 +278,7 @@ export const chat = async ({
         chatId,
         seq: userSeq,
         text,
+        context,
         sender: 'user',
         model: null,
         status: 'completed',
@@ -192,7 +313,9 @@ export const chat = async ({
     try {
         const previousMessages = await Message.find({
             chatId
-        }).sort({ seq: 1 }).lean();
+        })
+            .sort({ seq: 1 })
+            .lean();
 
         const messages = previousMessages.map((message) => ({
             role: message.sender === 'user'
@@ -201,54 +324,120 @@ export const chat = async ({
             content: message.text
         }));
 
-        messages.push({
-            role: 'user',
-            content: text
-        });
+        const mcpClient = await createMcpClient(userId);
 
-        const aiResponse = await cwm({
-            messages,
-            model,
-            temperature,
-            maxTokens
-        });
+        try {
+            const tools = await getMcpTools(mcpClient);
 
-        const aiSeq = userSeq + 1;
-        const aiTimestamp = new Date();
+            let currentResponse = await cwm({
+                messages: buildMessages({context, messages}),
+                model,
+                temperature,
+                maxTokens,
+                tools
+            });
 
-        const aiMessage = await Message.create({
-            chatId,
-            seq: aiSeq,
-            thoughts: aiResponse.reasoning || null,
-            text: aiResponse.text,
-            sender: 'assistant',
-            model: aiResponse.model,
-            status: 'completed',
-            timestamp: aiTimestamp
-        });
+            const MAX_TOOL_ROUNDS = 8;
 
-        await Chat.updateOne(
-            { _id: chatId },
-            {
-                $set: {
-                    lastMessage: aiResponse.text,
-                    lastTimestamp: aiTimestamp
+            for (
+                let round = 0;
+                round < MAX_TOOL_ROUNDS;
+                round++
+            ) {
+                const toolCalls = currentResponse.toolCalls;
+
+                if (!toolCalls?.length) {
+                    break;
                 }
-            }
-        );
 
-        return {
-            chatId,
-            messages: [
-                userMessage,
-                aiMessage
-            ],
-            meta: {
-                usage: aiResponse.usage,
-                responseId: aiResponse.responseId,
-                toolCalls: aiResponse.toolCalls
+                messages.push({
+                    role: 'assistant',
+                    content: currentResponse.text || null,
+                    tool_calls: toolCalls
+                });
+
+                for (const toolCall of toolCalls) {
+                    try {
+                        const toolResult = await executeMcpTool(
+                            mcpClient,
+                            toolCall
+                        );
+
+                        messages.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: serializeMcpResult(
+                                toolResult
+                            )
+                        });
+                    } catch (toolError) {
+                        messages.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: JSON.stringify({
+                                error: toolError.message
+                            })
+                        });
+                    }
+                }
+
+                currentResponse = await cwm({
+                    messages: buildMessages({context, messages}),
+                    model,
+                    temperature,
+                    maxTokens,
+                    tools
+                });
             }
-        };
+
+            if (currentResponse.toolCalls?.length) {
+                throw new Error(
+                    'Maximum MCP tool rounds exceeded'
+                );
+            }
+
+            const aiSeq = userSeq + 1;
+            const aiTimestamp = new Date();
+
+            const aiMessage = await Message.create({
+                chatId,
+                seq: aiSeq,
+                thoughts:
+                    currentResponse.reasoning || null,
+                text: currentResponse.text,
+                sender: 'assistant',
+                model: currentResponse.model,
+                status: 'completed',
+                timestamp: aiTimestamp
+            });
+
+            await Chat.updateOne(
+                { _id: chatId },
+                {
+                    $set: {
+                        lastMessage: currentResponse.text,
+                        lastTimestamp: aiTimestamp
+                    }
+                }
+            );
+
+            return {
+                chatId,
+                messages: [
+                    userMessage,
+                    aiMessage
+                ],
+                meta: {
+                    usage: currentResponse.usage,
+                    responseId:
+                        currentResponse.responseId,
+                    toolCalls:
+                        currentResponse.toolCalls
+                }
+            };
+        } finally {
+            await mcpClient.close();
+        }
     } catch (error) {
         const failedTimestamp = new Date();
 
@@ -267,7 +456,8 @@ export const chat = async ({
             { _id: chatId },
             {
                 $set: {
-                    lastMessage: 'Unable to generate a response.',
+                    lastMessage:
+                        'Unable to generate a response.',
                     lastTimestamp: failedTimestamp
                 }
             }
@@ -276,7 +466,6 @@ export const chat = async ({
         throw error;
     }
 };
-
 
 // Fetch chats belonging to a folder
 export const getChatsForFolder = async ({
