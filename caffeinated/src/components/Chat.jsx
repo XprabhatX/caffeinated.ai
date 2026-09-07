@@ -3,7 +3,10 @@ import React, { useEffect, useState } from 'react';
 import MarkdownRenderer from './markdown/MarkdownRenderer';
 
 const Chat = (props) => {
-    const { currentFolder } = props;
+    const {
+        currentFolder,
+        currentTopic
+    } = props;
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
     const token = localStorage.getItem('token');
@@ -22,6 +25,12 @@ const Chat = (props) => {
     const [modelError, setModelError] = useState(false);
     const [sendingMessage, setSendingMessage] = useState(false);
 
+    const [topicContextEnabled, setTopicContextEnable] = useState(false);
+
+    const handleToggleChatContext = () => {
+        setTopicContextEnable(!topicContextEnabled);
+    }
+
     const [models] = useState([
         {
             name: 'qwen3.5-4b',
@@ -31,6 +40,10 @@ const Chat = (props) => {
             name: 'qwen3-1.7b',
             value: 'qwen/qwen3-1.7b',
         },
+        {
+            name: 'Nemotron 3 Ultra',
+            value: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        }
     ]);
 
     const [selectedModel, setSelectedModel] = useState(
@@ -160,6 +173,9 @@ const Chat = (props) => {
         setSendingMessage(true);
 
         const context = [currentFolder];
+
+        if (currentTopic && topicContextEnabled)
+            context.push({currentTopicId: currentTopic});
 
         const tempUserMessage = {
             _id: `temp-${Date.now()}`,
@@ -351,7 +367,7 @@ const Chat = (props) => {
                                         >
                                             {msg.thoughts && (
                                                 <div className="mb-3 opacity-80">
-                                                    {msg.thoughts}
+                                                    {'Thoughts: ' + msg.thoughts}
                                                 </div>
                                             )}
 
@@ -411,8 +427,11 @@ const Chat = (props) => {
 
                     {/* Context */}
                     <div className="text-xs p-1 flex">
-                        <div className="p-1 rounded-md border border-white mr-2">Folder: {currentFolder?.name}</div>
-                        <div className="p-1 rounded-md border border-white mr-2 flex cursor-pointer">
+                        <div className="p-1 rounded-md border border-white mr-2 bg-white text-[#c08552] font-bold">Folder: {currentFolder?.name}</div>
+                        <div
+                            className={`p-1 rounded-md border border-white mr-2 flex cursor-pointer transition-all font-bold ${topicContextEnabled ? 'bg-white text-[#c08552]' : ''}`}
+                            onClick={handleToggleChatContext}
+                        >
                             Current Topic <span className='ml-1'>
                                 <svg
                                     viewBox="-2.5 0 32 32"

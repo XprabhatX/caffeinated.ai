@@ -9,8 +9,8 @@ import {
     StreamableHTTPClientTransport
 } from '@modelcontextprotocol/client';
 
-// Abstract model call
-export const cwm = async ({
+// LMStudio Call
+export const cwmLMStudio = async ({
     text,
     messages,
     model,
@@ -49,6 +49,80 @@ export const cwm = async ({
         model: response.data?.model || model,
         responseId: response.data?.id || null
     };
+};
+
+// OpenRouter Call
+export const cwmOpenRouter = async ({
+    text,
+    messages,
+    model,
+    temperature = 0.7,
+    maxTokens = 512,
+    tools = undefined
+}) => {
+    const response = await axios.post(
+    process.env.OPENROUTER_URL,
+    {
+        model,
+        messages: messages || [
+            {
+                role: 'user',
+                content: text,
+            }
+        ],
+        ...(tools?.length ? { tools } : {}),
+        temperature,
+        max_tokens: maxTokens,
+        stream: false
+    },
+    {
+        headers: {
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            // 'HTTP-Referer': process.env.SITE_URL,
+            // 'X-OpenRouter-Title': process.env.SITE_NAME,
+            'Content-Type': 'application/json',
+        },
+    }
+);
+
+    const choice = response.data?.choices?.[0];
+
+    if (!choice) {
+        throw new Error('Invalid response received from model');
+    }
+
+    return {
+        text: choice.message?.content || '',
+        reasoning: choice.message?.reasoning_content || '',
+        toolCalls: choice.message?.tool_calls || [],
+        usage: response.data?.usage || null,
+        model: response.data?.model || model,
+        responseId: response.data?.id || null
+    };
+};
+
+
+export const cwm = async ({
+    text,
+    messages,
+    model,
+    temperature = 0.7,
+    maxTokens = 512,
+    tools = undefined
+}) => {
+    const currentProvider = process.env.CURRENT_PROVIDER;
+
+    switch (currentProvider) {
+        case "LMSTUDIO":
+            return await cwmLMStudio({text, messages, model, temperature, maxTokens, tools});
+            break;
+        case "OPENROUTER":
+            return await cwmOpenRouter({text, messages, model, temperature, maxTokens, tools});
+            break;
+        default:
+            throw new Error('Invalid AI provider requested via server');
+            break;
+    }
 };
 
 
@@ -196,7 +270,7 @@ export const chat = async ({
             throw new Error('Folder not found');
         }
 
-        const titleResponse = await cwm({
+        const titleResponse = await cwmLMStudio({
             model: 'qwen/qwen3-1.7b',
             messages: [
                 {
