@@ -270,8 +270,8 @@ export const chat = async ({
             throw new Error('Folder not found');
         }
 
-        const titleResponse = await cwmLMStudio({
-            model: 'qwen/qwen3-1.7b',
+        const titleResponse = await cwm({
+            model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
             messages: [
                 {
                     role: 'system',
