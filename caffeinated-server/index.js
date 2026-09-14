@@ -7,6 +7,7 @@ import userRouter from './routes/user.routes.js'
 import folderRouter from './routes/folder.routes.js';
 import topicRouter from './routes/topic.routes.js';
 import chatRouter from './routes/chat.route.js';
+import modelRouter from './routes/model.route.js';
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use('/api/users', userRouter);
 app.use('/api/folders', folderRouter);
 app.use('/api/topics', topicRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/models', modelRouter);
 
 const connectDB = async () => {
     try {

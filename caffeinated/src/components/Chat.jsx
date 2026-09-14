@@ -31,24 +31,47 @@ const Chat = (props) => {
         setTopicContextEnable(!topicContextEnabled);
     }
 
-    const [models] = useState([
-        {
-            name: 'qwen3.5-4b',
-            value: 'qwen3.5-4b',
-        },
-        {
-            name: 'qwen3-1.7b',
-            value: 'qwen/qwen3-1.7b',
-        },
-        {
-            name: 'Nemotron 3 Ultra',
-            value: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-        }
-    ]);
+    const [models, setModels] = useState([]);
+    const [selectedModel, setSelectedModel] = useState(null);
+    const [loadingModels, setLoadingModels] = useState(false);
 
-    const [selectedModel, setSelectedModel] = useState(
-        'qwen/qwen3-1.7b'
-    );
+    // Fetch the currently avaialble models for the provider
+    useEffect(() => {
+        const fetchModels = async () => {
+            setLoadingModels(true);
+
+            try {
+                const response = await axios.get(
+                    `${apiBaseUrl}/api/models`,
+                    {
+                        headers
+                    }
+                );
+
+                const availableModels = response.data || [];
+
+                setModels(availableModels);
+
+                if (availableModels.length > 0) {
+                    setSelectedModel(availableModels[0].alias);
+                } else {
+                    setSelectedModel(null);
+                }
+            } catch (error) {
+                console.error(
+                    'failed to fetch models:',
+                    error.response?.data || error.message
+                );
+
+                setModels([]);
+                setSelectedModel(null);
+            } finally {
+                setLoadingModels(false);
+            }
+        };
+
+        fetchModels();
+    }, []);
 
     const messagesEndRef = React.useRef(null);
 
@@ -175,7 +198,7 @@ const Chat = (props) => {
         const context = [currentFolder];
 
         if (currentTopic && topicContextEnabled)
-            context.push({currentTopicId: currentTopic});
+            context.push({ currentTopicId: currentTopic });
 
         const tempUserMessage = {
             _id: `temp-${Date.now()}`,
@@ -407,21 +430,31 @@ const Chat = (props) => {
                     {/* Model selector */}
                     <div className="mr-2">
                         <select
-                            value={selectedModel}
+                            value={selectedModel || ''}
                             onChange={(event) =>
                                 setSelectedModel(event.target.value)
                             }
-                            className="bg-transparent border border-[#f3e9dc]/70 rounded-md px-2 py-1 text-xs text-[#f3e9dc] outline-none"
+                            disabled={models.length === 0}
+                            className="bg-transparent border border-[#f3e9dc]/70 rounded-md px-2 py-1 text-xs text-[#f3e9dc] outline-none disabled:opacity-50"
                         >
-                            {models.map((model) => (
+                            {models.length > 0 ? (
+                                models.map((model) => (
+                                    <option
+                                        key={model._id}
+                                        value={model.alias}
+                                        className="text-[#5e3023]"
+                                    >
+                                        {model.name}
+                                    </option>
+                                ))
+                            ) : (
                                 <option
-                                    key={model.value}
-                                    value={model.value}
+                                    value=""
                                     className="text-[#5e3023]"
                                 >
-                                    {model.name}
+                                    No models available at the moment
                                 </option>
-                            ))}
+                            )}
                         </select>
                     </div>
 
@@ -483,7 +516,9 @@ const Chat = (props) => {
                         disabled={
                             sendingMessage ||
                             !message.trim() ||
-                            !currentFolder
+                            !currentFolder ||
+                            !selectedModel ||
+                            models.length === 0
                         }
                         className="w-10 h-10 shrink-0 border border-[#f3e9dc]/70 rounded-full flex items-center justify-center hover:bg-[#f3e9dc]/10 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
