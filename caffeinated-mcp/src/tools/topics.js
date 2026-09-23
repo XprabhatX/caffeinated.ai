@@ -359,4 +359,310 @@ export const registerTopicTools = (server, user) => {
             };
         }
     );
+
+    server.tool(
+        'add_topic_notes',
+        `Append Markdown notes to an existing topic.
+
+RULES — ALL ARE STRICT AND MUST BE FOLLOWED:
+
+1. CHARACTER LIMIT
+- The notes string MUST contain 1500 characters or fewer.
+- Count every character, including spaces, punctuation, Markdown syntax,
+  Mermaid syntax, and newlines.
+
+2. MARKDOWN
+- notes MUST be plain Markdown.
+- Do NOT return JSON.
+- Do NOT return HTML.
+- Do NOT wrap the entire response in a code fence.
+- Mermaid is allowed ONLY inside a fenced Markdown block:
+
+\`\`\`mermaid
+flowchart TD
+    A[Input] --> B[Output]
+\`\`\`
+
+3. MERMAID DIAGRAM TYPE
+- Mermaid diagrams MUST use ONLY:
+    flowchart TD
+    flowchart LR
+- NEVER use graph TD or graph LR.
+- NEVER use sequenceDiagram, classDiagram, stateDiagram, erDiagram,
+  journey, timeline, mindmap, gitGraph, or any other Mermaid diagram type.
+
+4. MERMAID FLOWCHART ONLY
+- Use ordinary flowchart nodes and arrows only.
+- NEVER use sequence-diagram constructs.
+- NEVER use:
+    loop
+    alt
+    opt
+    par
+    critical
+    participant
+    activate
+    deactivate
+- Represent repeated processes using ordinary flowchart nodes and arrows.
+
+5. NODE IDS
+- Node IDs MUST contain ONLY ASCII letters, numbers, and underscores.
+- Node IDs MUST NOT contain spaces.
+- Node IDs MUST NOT contain hyphens, dots, brackets, braces,
+  parentheses, slashes, mathematical notation, or Unicode characters.
+
+VALID:
+    Input_Image
+    Noise_Model
+    Output1
+
+INVALID:
+    input-image
+    Input Image
+    x_{t-1}
+    node.one
+
+6. NODE LABELS — EXTREMELY RESTRICTED
+- Every node MUST use this format:
+
+    ID[Label]
+
+  or:
+
+    ID{Label}
+
+- The Label MUST contain ONLY:
+    ASCII letters A-Z
+    ASCII letters a-z
+    numbers 0-9
+    spaces
+
+- NO punctuation or symbols are allowed inside node labels.
+- Do NOT use:
+    parentheses
+    brackets
+    braces
+    commas
+    periods
+    colons
+    semicolons
+    slashes
+    backslashes
+    hyphens
+    underscores
+    @
+    #
+    $
+    %
+    &
+    =
+    +
+    -
+    *
+    /
+    <
+    >
+    ^
+    |
+    Unicode characters
+    Greek letters
+    arrows
+    mathematical operators
+    LaTeX
+    subscripts
+    superscripts
+
+VALID:
+    AUC Score
+    High AUC
+    True Positive Rate
+    Predict Noise
+    Previous Latent
+
+INVALID:
+    AUC = Area Under Curve
+    High AUC > 0.9
+    TPR@threshold
+    x_{t-1}
+    Q • K
+    ε theta
+
+IMPORTANT:
+- Convert technical notation into plain words.
+- For example:
+    "AUC > 0.9" becomes "AUC Above 0 Point 9"
+    "x_{t-1}" becomes "Previous Latent"
+    "Q • K transpose" becomes "Q Times K Transpose"
+
+7. EDGE SYNTAX
+- ONLY use these forms:
+
+    A --> B
+    A -.-> B
+    A -->|Label| B
+    A -.->|Label| B
+
+- Always put spaces around arrows.
+
+VALID:
+    A --> B
+    A -->|Predict Noise| B
+
+INVALID:
+    A-->B
+    A -->|Predict Noise|B
+    A<-B
+    A => B
+
+8. EDGE LABELS — EXTREMELY RESTRICTED
+- Edge labels MUST contain ONLY ASCII letters, numbers, and spaces.
+- No punctuation or symbols.
+- Do NOT use mathematical notation or Unicode.
+- Keep edge labels short.
+
+VALID:
+    A -->|Threshold Decreases| B
+
+INVALID:
+    A -->|Threshold decreases >| B
+    A -->|TPR @ threshold| B
+    A -->|Add Noise t equals T| B
+
+9. SUBGRAPHS
+- Subgraphs MAY be used.
+- Use ONLY:
+
+    subgraph Name
+        A[Node A] --> B[Node B]
+    end
+
+- Subgraph names MUST contain ONLY ASCII letters, numbers, and
+  underscores.
+- Do NOT use quoted subgraph titles.
+- Every subgraph MUST have exactly one matching end.
+- Do NOT put flow-control constructs inside subgraphs.
+
+10. NO SPECIAL CHARACTERS IN MERMAID
+- Treat Mermaid as ASCII-only.
+- The following characters are FORBIDDEN anywhere inside a Mermaid block
+  except the required Markdown fence itself:
+
+    < > ( ) { } = @ # $ % & + * / \\\\ : ; , ' " \` ^ | ~
+
+- Do NOT use Unicode symbols.
+- Do NOT use Greek letters.
+- Do NOT use mathematical operators.
+- Do NOT use LaTeX.
+- Do NOT use emoji.
+
+11. NO IMPLIED NODES
+- Every node MUST have an explicit ID.
+- Never write a multi-word node directly as an edge target.
+
+VALID:
+    Decoder[VAE Decoder]
+    Decoder --> Output[Generated Image]
+
+INVALID:
+    G --> VAE Decoder
+
+12. VALIDATION BEFORE RETURNING
+Before returning the notes, check EVERY Mermaid block:
+
+- First line is exactly flowchart TD or flowchart LR.
+- Every node ID uses only letters numbers underscores.
+- Every node has an explicit label.
+- Every node label contains only letters numbers spaces.
+- Every edge uses --> or -.->.
+- Every edge label contains only letters numbers spaces.
+- Every subgraph has a matching end.
+- No sequence-diagram syntax exists.
+- No Unicode exists.
+- No mathematical symbols exist.
+- No punctuation exists inside Mermaid labels.
+- No Mermaid syntax appears outside the mermaid fence.
+- The Mermaid block ends with \`\`\`.
+
+13. FALLBACK
+- A simple valid diagram is ALWAYS better than a sophisticated invalid
+  diagram.
+- If a concept requires mathematical notation, special characters,
+  equations, or complex Mermaid syntax, simplify the wording.
+- If the concept cannot be represented safely, DO NOT create a Mermaid
+  diagram. Explain it using normal Markdown instead.
+
+14. CONTENT
+- Keep notes concise and useful.
+- Do not mention these rules.
+- Do not mention Mermaid validation.
+- Do not include tool instructions in the notes.
+
+This tool APPENDS notes to the existing topic notes.
+It does NOT replace existing notes.
+
+The final notes value must be directly storable as a MongoDB string
+and must render correctly through ReactMarkdown and the application's
+Mermaid renderer.
+`,
+        {
+            topicId: z.string(),
+            notes: z.string()
+        },
+        async ({ topicId, notes }) => {
+            console.log(topicId, notes);
+
+            const topic = await verifyTopicOwnership(
+                topicId,
+                userId
+            );
+
+            if (!topic) {
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'Topic not found.'
+                        }
+                    ],
+                    isError: true
+                };
+            }
+
+            if (!notes.trim()) {
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'Notes cannot be empty.'
+                        }
+                    ],
+                    isError: true
+                };
+            }
+
+            const existingNotes = topic.notes || '';
+
+            // Keep the notes as a normal MongoDB string.
+            // Add a blank line between existing and new content.
+            const updatedNotes = existingNotes
+                ? `${existingNotes}\n\n${notes}`
+                : notes;
+
+            topic.notes = updatedNotes;
+            await topic.save();
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            success: true,
+                            topicId: topic._id.toString(),
+                            notes: topic.notes
+                        })
+                    }
+                ]
+            };
+        }
+    );
 };

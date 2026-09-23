@@ -195,10 +195,18 @@ const Chat = (props) => {
         setMessage('');
         setSendingMessage(true);
 
-        const context = [currentFolder];
+        const currentFolderContext = {
+            contextDescription: "this is an object of currently opened folder, it contains folder id",
+            currentFolder
+        };
+
+        const context = [currentFolderContext];
 
         if (currentTopic && topicContextEnabled)
-            context.push({ currentTopicId: currentTopic });
+            context.push({
+                contextDescription: "this is the currently opened topic's id from the current folder",
+                currentTopicId: currentTopic
+            });
 
         const tempUserMessage = {
             _id: `temp-${Date.now()}`,

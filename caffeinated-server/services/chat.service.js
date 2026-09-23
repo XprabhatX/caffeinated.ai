@@ -15,7 +15,7 @@ export const cwmLMStudio = async ({
     messages,
     model,
     temperature = 0.7,
-    maxTokens = 512,
+    maxTokens = 4096,
     tools = undefined
 }) => {
     const response = await axios.post(
@@ -57,33 +57,35 @@ export const cwmOpenRouter = async ({
     messages,
     model,
     temperature = 0.7,
-    maxTokens = 512,
+    maxTokens = 4096,
     tools = undefined
 }) => {
     const response = await axios.post(
-    process.env.OPENROUTER_URL,
-    {
-        model,
-        messages: messages || [
-            {
-                role: 'user',
-                content: text,
-            }
-        ],
-        ...(tools?.length ? { tools } : {}),
-        temperature,
-        max_tokens: maxTokens,
-        stream: false
-    },
-    {
-        headers: {
-            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            // 'HTTP-Referer': process.env.SITE_URL,
-            // 'X-OpenRouter-Title': process.env.SITE_NAME,
-            'Content-Type': 'application/json',
+        process.env.OPENROUTER_URL,
+        {
+            model,
+            messages: messages || [
+                {
+                    role: 'user',
+                    content: text,
+                }
+            ],
+            ...(tools?.length ? { tools } : {}),
+            temperature,
+            max_tokens: maxTokens,
+            stream: false
         },
-    }
-);
+        {
+            headers: {
+                Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                // 'HTTP-Referer': process.env.SITE_URL,
+                // 'X-OpenRouter-Title': process.env.SITE_NAME,
+                'Content-Type': 'application/json',
+            },
+        }
+    );
+
+    console.log(response);
 
     const choice = response.data?.choices?.[0];
 
@@ -107,17 +109,17 @@ export const cwm = async ({
     messages,
     model,
     temperature = 0.7,
-    maxTokens = 512,
+    maxTokens = 4096,
     tools = undefined
 }) => {
     const currentProvider = process.env.CURRENT_PROVIDER;
 
     switch (currentProvider) {
         case "LMSTUDIO":
-            return await cwmLMStudio({text, messages, model, temperature, maxTokens, tools});
+            return await cwmLMStudio({ text, messages, model, temperature, maxTokens, tools });
             break;
         case "OPENROUTER":
-            return await cwmOpenRouter({text, messages, model, temperature, maxTokens, tools});
+            return await cwmOpenRouter({ text, messages, model, temperature, maxTokens, tools });
             break;
         default:
             throw new Error('Invalid AI provider requested via server');
@@ -249,7 +251,7 @@ export const chat = async ({
     context,
     model,
     temperature = 0.7,
-    maxTokens = 512
+    maxTokens = 4096
 }) => {
     let chatDocument;
 
@@ -271,7 +273,7 @@ export const chat = async ({
         }
 
         const titleResponse = await cwm({
-            model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+            model: process.env.TITLE_MODEL,
             messages: [
                 {
                     role: 'system',
@@ -404,7 +406,7 @@ export const chat = async ({
             const tools = await getMcpTools(mcpClient);
 
             let currentResponse = await cwm({
-                messages: buildMessages({context, messages}),
+                messages: buildMessages({ context, messages }),
                 model,
                 temperature,
                 maxTokens,
@@ -444,6 +446,8 @@ export const chat = async ({
                                 toolResult
                             )
                         });
+
+                        console.log('CURRENT TOOL RESULT:', toolResult);
                     } catch (toolError) {
                         messages.push({
                             role: 'tool',
@@ -456,7 +460,7 @@ export const chat = async ({
                 }
 
                 currentResponse = await cwm({
-                    messages: buildMessages({context, messages}),
+                    messages: buildMessages({ context, messages }),
                     model,
                     temperature,
                     maxTokens,
@@ -472,6 +476,18 @@ export const chat = async ({
 
             const aiSeq = userSeq + 1;
             const aiTimestamp = new Date();
+
+            console.log('FINAL CURRENT RESPONSE:', {
+                currentResponse,
+                text: currentResponse?.text,
+                reasoning: currentResponse?.reasoning,
+                model: currentResponse?.model
+            });
+
+            console.log(
+                'currentResponse.text type:',
+                typeof currentResponse?.text
+            );
 
             const aiMessage = await Message.create({
                 chatId,

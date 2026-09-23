@@ -30,6 +30,9 @@ app.post(
     '/mcp',
     authenticateRequest,
     async (req, res) => {
+        console.log(
+            JSON.stringify(req.body, null, 2)
+        );
         const server = createServer(req.user);
 
         const transport = new StreamableHTTPServerTransport({
