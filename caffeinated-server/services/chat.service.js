@@ -386,6 +386,9 @@ export const chat = async ({
      * The current implementation intentionally stops after one model call.
      */
 
+    let uiUpdateTopicId;
+    let uiUpdates;
+
     try {
         const previousMessages = await Message.find({
             chatId
@@ -448,6 +451,28 @@ export const chat = async ({
                         });
 
                         console.log('CURRENT TOOL RESULT:', toolResult);
+
+                        const toolText = toolResult?.content
+                            ?.find(item => item.type === 'text')
+                            ?.text;
+
+                        console.log('RAW MCP TEXT:', toolText);
+                        console.log('RAW MCP TEXT JSON:', JSON.stringify(toolText));
+
+                        try {
+                            const textObj = JSON.parse(toolText);
+
+                            console.log('PARSED TOOL OBJECT:', textObj);
+
+                            uiUpdateTopicId = textObj.topicId;
+                            uiUpdates = textObj.uiUpdates;
+
+                            console.log('ui updated parsed');
+                        } catch (error) {
+                            console.error('MCP UI JSON PARSE FAILED');
+                            console.error('Error:', error.message);
+                            console.error('Value:', JSON.stringify(toolText));
+                        }
                     } catch (toolError) {
                         messages.push({
                             role: 'tool',
@@ -511,6 +536,17 @@ export const chat = async ({
                 }
             );
 
+            let uiActions;
+
+            if (uiUpdates) {
+                uiActions = uiUpdates;
+                if (uiUpdateTopicId)
+                    uiActions.topicId = uiUpdateTopicId;
+            }
+            else {
+                uiActions = 'none'
+            }
+
             return {
                 chatId,
                 messages: [
@@ -523,7 +559,8 @@ export const chat = async ({
                         currentResponse.responseId,
                     toolCalls:
                         currentResponse.toolCalls
-                }
+                },
+                uiActions
             };
         } finally {
             await mcpClient.close();

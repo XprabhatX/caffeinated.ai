@@ -367,7 +367,7 @@ export const registerTopicTools = (server, user) => {
 RULES — ALL ARE STRICT AND MUST BE FOLLOWED:
 
 1. CHARACTER LIMIT
-- The notes string MUST contain 1500 characters or fewer.
+- The notes string MUST contain 15000 characters or fewer.
 - Count every character, including spaces, punctuation, Markdown syntax,
   Mermaid syntax, and newlines.
 
@@ -659,6 +659,97 @@ Mermaid renderer.
                             success: true,
                             topicId: topic._id.toString(),
                             notes: topic.notes
+                        })
+                    }
+                ]
+            };
+        }
+    );
+
+    server.tool(
+        'update_ui',
+        `Crucial last tool to call if following 4 changes are made:
+1. created a topic
+2. deleted a topic
+3. updated topic name or description
+4. added or updated topic notes
+or
+5. you want to close the currently open topic in ui
+6. you want to close a topic with certain id if it is open (send topicId if true)
+7. you want to open a topic in ui (send topicId if true)
+8. you want to refresh the certain topic (with a topicId) content if it is open in ui since you made changes to it (send topicId if true)
+`,
+        {
+            createdOrUpdatedTopic: z.boolean(),
+            updatedTopicNameOrDescription: z.boolean(),
+            addedOrUpdatedTopicNotes: z.boolean(),
+            shouldCloseCurrentTopic: z.boolean(),
+            shouldCloseTopicWithIdIfOpenInUI: z.boolean(),
+            shouldOpenTopicWithID: z.boolean(),
+            shouldRefreshTopicWithIdIfOpenInUI: z.boolean(),
+            topicId: z.string(),
+        },
+        async ({
+                createdOrUpdatedTopic,
+                updatedTopicNameOrDescription,
+                addedOrUpdatedTopicNotes,
+                shouldCloseCurrentTopic,
+                shouldCloseTopicWithIdIfOpenInUI,
+                shouldOpenTopicWithID,
+                shouldRefreshTopicWithIdIfOpenInUI,
+                topicId
+            }) => {
+
+            let uiUpdates = {
+                refresh_left_panel_current_folder: false,
+                refresh_current_topic_content: false,
+                open_topic_with_id: false,
+                close_topic_if_id: false,
+                close_current_topic: false,
+                refresh_topic_if_id: false
+            }
+
+            if (
+                createdOrUpdatedTopic || 
+                updatedTopicNameOrDescription ||
+                addedOrUpdatedTopicNotes
+            ) {
+                uiUpdates.refresh_left_panel_current_folder = true;
+            }
+            if (addedOrUpdatedTopicNotes) {
+                uiUpdates.refresh_current_topic_content = true;
+            }
+            uiUpdates.close_current_topic = shouldCloseCurrentTopic;
+            uiUpdates.close_topic_if_id = shouldCloseTopicWithIdIfOpenInUI;
+            uiUpdates.open_topic_with_id = shouldOpenTopicWithID;
+            uiUpdates.refresh_topic_if_id = shouldRefreshTopicWithIdIfOpenInUI;
+
+            if (
+                (
+                    uiUpdates.open_topic_with_id || 
+                    uiUpdates.close_topic_if_id ||
+                    uiUpdates.refresh_topic_if_id
+                ) &&
+                 !topicId) {
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'Topic id was not found for the required ui update.'
+                        }
+                    ],
+                    isError: true
+                };
+            }
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            success: true,
+                            topicId,
+                            uiUpdates
                         })
                     }
                 ]
